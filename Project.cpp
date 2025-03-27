@@ -1,5 +1,5 @@
 #include<iostream>
-#include<string.h>
+#include<string>
 #include <iomanip>
 #include <ctime>
 using namespace std;
@@ -146,6 +146,13 @@ public:
 	void availability();	//CHECK AVAILABILITY OF ROOMS
 	void CheckOut();		//CHECKOUT AND BILLING PROCEDURE
 	void Summary();			//GUEST SUMMARY
+
+	//help funcs
+	bool isValidRoom(int rno);
+	int getRoomIndex(int rno);
+	bool confirmBooking(Room& room);
+	double getValidAdvance(double totalBill);
+	void printBookingDetails(int custIndex, int rno);
 };
 void Hotel::addRooms()
 {
@@ -222,77 +229,103 @@ void Hotel::searchroom()	//SEARCH FOR A PARTICULAR TYPE OF A ROOM
 		cout<<"No such room is available."<<endl;
 	}
 }
-void Hotel::CheckIn()		//CHECK IN OF A CUSTOMER
-{
-	if(nroom==0)
-	{
-		cout<<"Please add rooms."<<endl;
+
+bool Hotel::isValidRoom(int rno) {
+	for (int i = 0; i < nroom; i++) {
+		if (a[i].roomNumber == rno) return true;
+	}
+	return false;
+}
+
+int Hotel::getRoomIndex(int rno) {
+	for (int i = 0; i < nroom; i++) {
+		if (a[i].roomNumber == rno) return i;
+	}
+	return -1; // Не знайдено (але цей випадок не повинен траплятися, бо перевіряємо раніше)
+}
+
+bool Hotel::confirmBooking(Room& room) {
+	char ch;
+	cout << "Room available." << endl;
+	room.displayroom();
+	cout << "Do you wish to continue? Press (Y/y): ";
+	cin >> ch;
+	return (ch == 'Y' || ch == 'y');
+}
+
+double Hotel::getValidAdvance(double totalBill) {
+	double advance;
+	do {
+		cout << "Your total bill will be Rs." << totalBill << ". Min advance payment=" << totalBill / 4
+			<< ". What will you be paying? ";
+		cin >> advance;
+	} while (advance < totalBill / 4 || advance > totalBill);
+	return advance;
+}
+
+void Hotel::printBookingDetails(int custIndex, int rno) {
+	cout << "--------------------------------------------------------------" << endl;
+	cout << "Booking Id: " << c[custIndex].booking_id
+		<< "\nName: " << c[custIndex].name
+		<< "\nRoom no.: " << rno
+		<< "\nDate: ";
+
+	time_t my_time = time(nullptr);
+	char timeBuffer[26];
+	ctime_s(timeBuffer, sizeof(timeBuffer), &my_time);
+	printf("%s", timeBuffer);
+}
+
+void Hotel::CheckIn() {
+	if (nroom == 0) {
+		cout << "Please add rooms." << endl;
 		return;
 	}
-	int i, rno;
-	if(ncust<=nroom){	//CHECKING CONDITION IF HOTEL HAS EMPTY ROOMS
-		c[ncust].booking_id=ncust+1;	//ALLOTING CUSTOMER ID TO THE CUSTOMER
-		flag:
-		int flag1=0;
-		cout<<"Enter room number=";		//ASKING WHAT ROOM NUMBER CUSTOMER WANTS TO STAY IN
-		cin>>rno;
-		for(i=0;i<nroom; i++){
-			if(rno==a[i].roomNumber)
-			{
-				flag1=1;
-				break;
-			}
-		}
-		if(flag1==0){
-			cout<<"Invalid room number. Please Enter again.\n";
-			goto flag;
-		}
-		if(a[i].status==0)		//CHECKING IF ROOM IS UNOCCUPIED
-		{
-			char ch2;
-			cout<<"Room available."<<endl;
-			a[i].displayroom();
-			cout<<"Do you wish to continue? Press(Y/y)";		//CONFIRMATION
-			cin>>ch2;
-			if(ch2=='Y'||ch2=='y')
-			{
-				c[ncust].accept();		//ACCEPTING CUSTOMER DETAILS
-				cout<<"Enter number of days of stay: ";
-				cin>>c[ncust].days;
-				c[ncust].bill = c[ncust].days*a[i].rent;		//generating bill. bill= No. of days * rent per day.
-				cout<<"Your total bill will approx be Rs."<<(c[ncust].bill)<<"."<<endl<<". Min adv payment="<<c[ncust].bill/4<<"What will you be paying?";
-				cin>>c[ncust].payment_advance;
-				while(c[ncust].payment_advance<c[ncust].bill/4||c[ncust].payment_advance>c[ncust].bill)
-				{
-					cout<<"Enter valid amount.";
-					cin>>c[ncust].payment_advance;
-				}
-				cout<<"Thank you. Booking confirmed."<<endl;		//confirmed booking
-				cout<<"--------------------------------------------------------------"<<endl;		//printing booking details
-				cout<<"Booking Id: "<<c[ncust].booking_id<<"\nName: "<<c[ncust].name<<"\nRoom no.: "<<rno<<"\nDate: ";
-				time_t my_time = time(NULL);
-						// ctime() used to give the present time
-				printf("%s", ctime(&my_time));
-				a[i].status=1;		//changing room status to booked
-				c[ncust].room=rno;		//alloting room to customer
-				c[ncust].status=1;
-				ncust++;
-			}
-			else		//if needs to change room number
-			{
-				goto flag;
-			}
-		}
-		else		//if room is occupied
-		{
-			cout<<"Room Occupied. Please choose another room."<<endl;
-		}
+
+	if (ncust > nroom) {
+		cout << "Sorry! Hotel is Full." << endl;
+		return;
 	}
-	else		//CONDITION ALL ROOMS ARE BOOKED
-	{
-		cout<<"Sorry! Hotel is Full."<<endl;
+
+	c[ncust].booking_id = ncust + 1;  // Присвоюємо ID клієнта
+
+	int rno;
+	while (true) { // Запитуємо номер кімнати, поки не отримаємо валідний
+		cout << "Enter room number: ";
+		cin >> rno;
+		if (isValidRoom(rno)) break; // Перевірка номера кімнати
+		cout << "Invalid room number. Please enter again.\n";
 	}
+
+	int roomIndex = getRoomIndex(rno); // Отримуємо індекс кімнати
+	if (a[roomIndex].status == 1) {
+		cout << "Room is occupied. Please choose another room." << endl;
+		return;
+	}
+
+	// Підтвердження бронювання
+	if (!confirmBooking(a[roomIndex])) return;
+
+	// Приймаємо дані клієнта
+	c[ncust].accept();
+	cout << "Enter number of days of stay: ";
+	cin >> c[ncust].days;
+
+	// Обчислення рахунку
+	c[ncust].bill = c[ncust].days * a[roomIndex].rent;
+	c[ncust].payment_advance = getValidAdvance(c[ncust].bill);
+	cout << "Thank you. Booking confirmed." << endl;
+
+	// Вивід деталей бронювання
+	printBookingDetails(ncust, rno);
+
+	// Оновлюємо статуси
+	a[roomIndex].status = 1;
+	c[ncust].room = rno;
+	c[ncust].status = 1;
+	ncust++;
 }
+
 void Hotel::searchcust()
 {
 	int id, flag=0;
